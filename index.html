@@ -162,6 +162,8 @@ body {
   font-weight: bold;
   border-radius: 6px;
   cursor: pointer;
+  text-decoration: none;
+  display: inline-block;
 }
 .ctrl-btn:disabled { background: #94a3b8; }
 
@@ -175,6 +177,14 @@ body {
   display: flex;
   justify-content: space-between;
   align-items: center;
+}
+
+.info-card {
+  background: #ffffff;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 18px;
+  margin-bottom: 20px;
 }
 
 .form-group {
@@ -269,7 +279,7 @@ input, textarea, select {
   <!-- TAB: RESOURCE HUB -->
   <div id="res-tab" class="card tab-content">
     <h3>Lesson Resource & Reference Hub</h3>
-    <p class="muted">Access official course references below.</p>
+    <p class="muted">Access official course references and station files below.</p>
     <div id="resource-list">
       <!-- Resources injected by script.js -->
     </div>
@@ -293,15 +303,14 @@ let bellringers = [];
 
 // Stock image pool for default visual slides
 const stockImagePool = [
-  'https://images.unsplash.com/photo-1544716278-ca5e3f4abd8c?auto=format&fit=crop&w=300&q=80', // Turtle / Nature
-  'https://images.unsplash.com/photo-1518709268805-4e9042af9f23?auto=format&fit=crop&w=300&q=80', // Water / Earth-Diver
-  'https://images.unsplash.com/photo-1500382017468-9049fed747ef?auto=format&fit=crop&w=300&q=80', // Ecology / Forest
-  'https://images.unsplash.com/photo-1516321318423-f06f85e504b3?auto=format&fit=crop&w=300&q=80', // Campfire / Orality
-  'https://images.unsplash.com/photo-1457369804613-52c61a468e7d?auto=format&fit=crop&w=300&q=80', // Literature / History
-  'https://images.unsplash.com/photo-1455390582262-044cdead277a?auto=format&fit=crop&w=300&q=80'  // Writing Workshop
+  'https://images.unsplash.com/photo-1544716278-ca5e3f4abd8c?auto=format&fit=crop&w=300&q=80',
+  'https://images.unsplash.com/photo-1518709268805-4e9042af9f23?auto=format&fit=crop&w=300&q=80',
+  'https://images.unsplash.com/photo-1500382017468-9049fed747ef?auto=format&fit=crop&w=300&q=80',
+  'https://images.unsplash.com/photo-1516321318423-f06f85e504b3?auto=format&fit=crop&w=300&q=80',
+  'https://images.unsplash.com/photo-1457369804613-52c61a468e7d?auto=format&fit=crop&w=300&q=80',
+  'https://images.unsplash.com/photo-1455390582262-044cdead277a?auto=format&fit=crop&w=300&q=80'
 ];
 
-// Emoji fallback pool
 const iconPool = ['🐢', '🌊', '🌱', '🗣️', '☯️', '📝'];
 
 function renderSlides(slides) {
@@ -313,9 +322,7 @@ function renderSlides(slides) {
     wrapper.className = 'slide' + (index === 0 ? ' active' : '');
     wrapper.id = `slide-${index + 1}`;
 
-    // Priority 1: slide.image OR Stock Web Image
     const imageUrl = slide.image || stockImagePool[index % stockImagePool.length];
-    // Fallback: slide.icon OR Emoji Pool
     const fallbackEmoji = slide.icon || iconPool[index % iconPool.length];
 
     const visualMediaHTML = `
@@ -347,6 +354,7 @@ function renderSlides(slides) {
     stage.appendChild(wrapper);
   });
 }
+
 function initLesson(data) {
   bellringers = data.bellringers || [];
   totalSlides = (data.slides || []).length || 1;
@@ -354,7 +362,7 @@ function initLesson(data) {
   document.getElementById('slide-tracker').innerText = `Slide 1 of ${totalSlides}`;
 
   renderSlides(data.slides || []);
-  renderResources(data.resources || []);
+  renderResources(data.resources || {});
   renderForm(data.form || []);
 
   randomizeBellringer();
@@ -383,19 +391,68 @@ function renderResources(resources) {
   const container = document.getElementById('resource-list');
   container.innerHTML = '';
 
-  const resourceList = Array.isArray(resources) ? resources : (resources && typeof resources === 'object' ? [resources] : []);
+  if (!resources) return;
 
-  resourceList.forEach(res => {
+  // 1. Render Overview & Materials Card if present
+  if (typeof resources === 'object' && !Array.isArray(resources)) {
+    if (resources.title || resources.description || resources.materials_needed) {
+      const overviewCard = document.createElement('div');
+      overviewCard.className = 'info-card';
+      
+      let matsHTML = '';
+      if (resources.materials_needed && resources.materials_needed.length) {
+        matsHTML = `<strong>Materials & Materials Needed:</strong><ul>${resources.materials_needed.map(m => `<li>${m}</li>`).join('')}</ul>`;
+      }
+      
+      let setupHTML = '';
+      if (resources.station_setup && resources.station_setup.length) {
+        setupHTML = `<strong>Station Setup Overview:</strong><ul>${resources.station_setup.map(s => `<li>${s}</li>`).join('')}</ul>`;
+      }
+
+      overviewCard.innerHTML = `
+        <h4 style="margin-top:0;">${resources.title || 'Activity Overview'}</h4>
+        <p class="muted">${resources.description || ''}</p>
+        ${matsHTML}
+        ${setupHTML}
+      `;
+      container.appendChild(overviewCard);
+    }
+  }
+
+  // 2. Extract and render resource buttons
+  let buttonItems = [];
+  if (Array.isArray(resources)) {
+    resources.forEach(res => {
+      if (res.buttons && Array.isArray(res.buttons)) {
+        buttonItems.push(...res.buttons);
+      } else {
+        buttonItems.push(res);
+      }
+    });
+  } else if (typeof resources === 'object') {
+    if (resources.buttons && Array.isArray(resources.buttons)) {
+      buttonItems = resources.buttons;
+    } else {
+      buttonItems = [resources];
+    }
+  }
+
+  const buttonsHeader = document.createElement('h4');
+  buttonsHeader.innerText = "Resource Downloads & External Links";
+  buttonsHeader.style.marginBottom = "12px";
+  container.appendChild(buttonsHeader);
+
+  buttonItems.forEach(item => {
     const card = document.createElement('div');
     card.className = 'resource-card';
 
-    const resourceUrl = res.file || res.link || res.url || '#';
-    const resourceTitle = res.title || res.name || 'Resource Item';
+    const resourceUrl = item.file || item.link || item.url || '#';
+    const resourceTitle = item.label || item.title || item.name || 'Download Resource';
 
     card.innerHTML = `
       <div>
         <strong>${resourceTitle}</strong><br/>
-        <small>${res.description || ''}</small>
+        <small class="muted">${item.description || resourceUrl}</small>
       </div>
       <a href="${resourceUrl}" target="_blank" rel="noopener noreferrer" class="ctrl-btn">
         Open Resource
@@ -461,6 +518,7 @@ function switchTab(key) {
     document.getElementById('form-tab').classList.add('active');
   }
 }
+
 window.addEventListener('DOMContentLoaded', () => initLesson({"course": "English 11: American Literature", "unit": "Unit 4: The Crucible - Ethical Confrontation", "day": 14, "week": 4, "day_title": "Intertextual Studies: 'Half-Hanged Mary' and Individual Defiance", "weekly_focus": "Investigating the impact of the court's proceedings on domestic relationships and legal peril (MN State ELA Standards: 11.1.4.3 & 11.1.4.1)", "bellringers": ["Compare John Proctor's ultimate decision at the end of Act III with the concept of surviving an unjust execution through sheer mental defiance.", "Examine the historical context of Mary Webster (1680s Massachusetts). What risks did independent women face in Puritan New England?", "How does the structural form of a poem alter tone and emotional intensity compared to a dramatic stage play script?", "Write a one-sentence thesis statement defining how an individual maintains autonomy when institutional authorities collapse into corruption."], "slides": [{"title": "Introduction to Late 20th-Century Perspectives on Salem", "standard": "MN State ELA Standard 11.1.4.3", "bullets": ["Analyzing Margaret Atwood's 1995 poem 'Half-Hanged Mary' as a modern feminist critique of colonial witch trials.", "Connecting Arthur Miller's 1953 allegory of McCarthyism to Atwood's exploration of ancestral trauma and female survival.", "Evaluating how late twentieth-century literature reframes colonial Puritan trials from tragic downfall to subversive endurance."], "callout": "Key Question: How does modern lyrical expression reshape our understanding of historical defiance compared to mid-century drama?"}, {"title": "Historical Grounding: The Story of Mary Webster", "standard": "MN State ELA Standard 11.1.4.1", "bullets": ["Mary Webster was accused of witchcraft in Hadley, Massachusetts in 1680, years before the Salem outbreak.", "Hanged from a tree overnight by an angry mob, she survived until morning and lived for another fourteen years.", "Atwood, a direct descendant of Webster, uses hourly stanza progressions from 7pm to 8am to track psychological resistance."], "callout": "Textual Connection: Both Miller and Atwood draw upon historical records to challenge institutional injustice."}, {"title": "Structural & Lyrical Mechanics of 'Half-Hanged Mary'", "standard": "MN State ELA Standard 11.1.4.3", "bullets": ["The poem is structured chronologically by hours of the night, mirroring a grueling physical and spiritual ordeal.", "Use of free verse, visceral imagery, and shifting stanza lengths to reflect physical strangulation and mental liberation.", "Contrast between the cold formality of court proceedings and the raw, internal voice of the condemned victim."], "callout": "Structural Focus: Pay attention to how time expands and contracts across the hourly stanza markers."}, {"title": "7pm - 8pm: The Accusation & The Noose", "standard": "MN State ELA Standard 11.1.4.1", "bullets": ["Examining the motives of the accusers: owning property, living alone, and failing to conform to submissive gender roles.", "Comparing the crowd's mob mentality in Atwood's poem to the court crowd in Miller's 'The Crucible'.", "Citing specific diction that highlights how gossip is weaponized into legal capital punishment."], "callout": "Evidence Hunt: Identify lines where Atwood pinpoints economic and social jealousy as the root of accusation."}, {"title": "9pm - 12am: Isolation & The Dark Night of the Soul", "standard": "MN State ELA Standard 11.1.4.3", "bullets": ["Analyzing the psychological transition from panic to emotional numbness during prolonged persecution.", "Evaluating the absence of divine intervention as Mary hangs between heaven and earth.", "Comparing Mary's internal monologue with John Proctor's jailhouse doubts in Act IV."], "callout": "Comparative Theme: How do both authors depict God's perceived silence during human suffering?"}, {"title": "Comparative Critique: Mary Webster vs. John Proctor", "standard": "MN State ELA Standard 11.1.4.3", "bullets": ["Proctor chooses death on the gallows to preserve his name, integrity, and ethical legacy.", "Mary Webster survives physical hanging, transforming her lingering life into an eerie, untouchable defiance against her town.", "Contrasting Proctor's tragic martyrdom with Mary's unyielding, bitter survivalism."], "callout": "Debate Prompt: Is survival under a corrupt system a stronger form of defiance than dying for a principle?"}, {"title": "Comparative Critique: Mary Webster vs. Giles Corey", "standard": "MN State ELA Standard 11.1.4.1", "bullets": ["Giles Corey defies the court through silent refusal ('More weight'), using legal loopholes to protect his family land.", "Mary Webster defies the community through bodily endurance and refusal to let her spirit collapse under physical agony.", "Both figures utilize stubborn physical resistance to expose the absurd cruelty of the legal system."], "callout": "Textual Evidence: Compare Corey's final spoken words with Mary's internal defiance at 2am."}, {"title": "3am - 5am: The Transformation of Language and Identity", "standard": "MN State ELA Standard 11.1.4.3", "bullets": ["Atwood illustrates the death of Mary's old, compliant self and the birth of a radically detached, powerful identity.", "Language breaks down into fragmentary, surreal imagery as oxygen deprivation strips away societal conditioning.", "The shift from victimhood to an unassailable force that the superstitious community can no longer control."], "callout": "Literary Shift: Observe how stanza breaks become shorter and sharper as dawn approaches."}, {"title": "6am - 8am: Dawn, Cut Down, and Radical Autonomy", "standard": "MN State ELA Standard 11.1.4.1", "bullets": ["Townspeople arrive to find her alive, paralyzed by fear because their legal authority has failed to kill her.", "Mary becomes an outcast living on the fringes, feared by the community that tried to destroy her.", "Analyzing the concluding stanza: 'Before, I was not a witch / But now I am one.'"], "callout": "Inference Point: How does community persecution fulfill its own dark prophecies?"}, {"title": "Activity Briefing: The Gallows Gallery Walk", "standard": "MN State ELA Standard 11.1.4.3", "bullets": ["Groups will rotate through 6 Stanza Stations placed around the room to analyze Atwood's poem against 'The Crucible'.", "Each table group must decode the specific 'Defiance Mechanism' featured at the station using textual quotes.", "Discuss and record comparative insights linking Mary's internal monologue to Proctor, Giles, or Rebecca Nurse."], "callout": "Movement Focus: Engage in peer dialogue at each station and contribute 1 written insight to the station chart."}, {"title": "Debrief & Evidence Synthesis", "standard": "MN State ELA Standard 11.1.4.1", "bullets": ["Reconvening as a whole class to map out the comparative continuum between dramatic fiction and lyrical poetry.", "Synthesizing how 20th-century authors reframe colonial history to address modern authoritarian threats.", "Checking evidence logs for rigorous citations from both Miller's script and Atwood's poem."], "callout": "Synthesis Target: Ensure your evidence log cites at least two direct quotes from each text."}, {"title": "Exit Ticket & Assessment Preparation", "standard": "MN State ELA Standard 11.1.4.1", "bullets": ["Complete the 10-question comparative assessment form examining character motivation and poetic structure.", "Previewing upcoming synthesis essay prompt: Ethical Confrontation in American Drama and Poetry.", "Submit completed Gallows Gallery Walk evidence logs to the assignment tray."], "callout": "Final Thought: Defiance takes many forms—sometimes it is a public speech, and sometimes it is simply surviving the night."}], "resources": {"tab": "resources", "title": "The Gallows Gallery Walk: Stanza Stations of Defiance", "description": "A low-resource, high-engagement room movement activity. Six physical signs are posted around the room representing hourly blocks of Atwood's poem paired with corresponding characters/scenes from Miller's 'The Crucible'. Student table teams rotate through stations with an Evidence Log worksheet.", "materials_needed": ["6 printed Stanza Station Signs (7pm, 10pm, 12am, 3am, 6am, 8am)", "Student Evidence Log Worksheets (1 per student)", "Colored Dry-Erase Markers for Station Poster Collaboration", "Timer for 5-Minute Station Rotations", "Try to have a printed copy of 'Half-Hanged Mary' and 'The Crucible' available for reference at each station.", "Do not pack the stations; 2 students per station is sufficient for collaborative discussion and note-taking."], "buttons": [{"label": "The Crucible Full Text", "file": "https://fliphtml5.com/rgfr/oent/basic"}, {"label": "Half-Hanged Mary Poem PDF", "file": "https://allpoetry.com/poem/15757257-Half-Hanged-Mary-by-Margaret-Atwood"}, {"label": "Station Response Sheet", "file": "English11_Gallows_Gallery_Walk_Stations.pdf"}], "station_setup": ["Station 1 (7pm): The Accusation — Paired with Abigail's initial claims in Act I.", "Station 2 (10pm): The Crowd's Gaze — Paired with Mary Warren breaking in Act III.", "Station 3 (12am): Gods & Silence — Paired with John Proctor's crisis in Act IV.", "Station 4 (3am): Physical Resistance — Paired with Giles Corey's pressing.", "Station 5 (6am): The Failure of the Noose — Paired with Elizabeth Proctor's final monologue.", "Station 6 (8am): Radical Autonomy — Paired with Proctor's final refusal to surrender his signed name."]}, "form": [{"id": "student_name", "type": "text", "label": "Student Name", "required": true}, {"id": "checkpoint_date", "type": "date", "label": "Date", "required": true}, {"id": "q1", "type": "multiple_choice", "prompt": "How does Margaret Atwood's 'Half-Hanged Mary' deepen the reader's understanding of the social dynamics in Arthur Miller's 'The Crucible'?", "options": ["By showing the court's justice as fair and compassionate", "By emphasizing the emotional and political cost of accusation, isolation, and gendered persecution", "By focusing only on the economics of colonial New England", "By replacing the Salem trials with a modern courtroom drama"], "answer": "By emphasizing the emotional and political cost of accusation, isolation, and gendered persecution"}, {"id": "q2", "type": "multiple_choice", "prompt": "Which historical figure directly inspired Margaret Atwood's poem 'Half-Hanged Mary'?", "options": ["Rebecca Nurse", "Mary Webster", "Elizabeth Proctor", "Abigail Williams"], "answer": "Mary Webster"}, {"id": "q3", "type": "multiple_choice", "prompt": "What historical event is Arthur Miller's 'The Crucible' most widely read as an allegory for?", "options": ["The Civil Rights Movement", "The Great Depression", "McCarthyism", "The American Revolution"], "answer": "McCarthyism"}, {"id": "q4", "type": "multiple_choice", "prompt": "Why was Mary Webster accused of witchcraft in colonial Massachusetts?", "options": ["She publicly challenged church doctrine", "She was an independent woman who did not conform to social expectations", "She owned a famous printing press", "She confessed to practicing sorcery"], "answer": "She was an independent woman who did not conform to social expectations"}, {"id": "q5", "type": "multiple_choice", "prompt": "How does the poem's hourly structure affect the reader's understanding of Mary's experience?", "options": ["It makes the poem feel cheerful and uplifting", "It mirrors the slow movement of time through physical and psychological suffering", "It emphasizes the speed of the town's justice system", "It represents the timeline of the Salem trials"], "answer": "It mirrors the slow movement of time through physical and psychological suffering"}, {"id": "q6", "type": "multiple_choice", "prompt": "What is the central difference between John Proctor's and Mary Webster's forms of defiance?", "options": ["Proctor survives while Mary dies", "Proctor chooses death for integrity while Mary survives bodily hanging in a state of bitter resistance", "Mary refuses to speak while Proctor speaks publicly", "Both are destroyed by the court"], "answer": "Proctor chooses death for integrity while Mary survives bodily hanging in a state of bitter resistance"}, {"id": "q7", "type": "multiple_choice", "prompt": "Which phrase is most closely associated with Giles Corey's defiance of the court?", "options": ["I have no name", "More weight", "I am not a witch", "Because it is my name"], "answer": "More weight"}, {"id": "q8", "type": "multiple_choice", "prompt": "What does Atwood suggest by depicting Mary's survival after the hanging?", "options": ["The court was completely just and effective", "Institutional authority can fail even while fear remains", "Mary was never truly condemned", "The town immediately forgave her"], "answer": "Institutional authority can fail even while fear remains"}, {"id": "q9", "type": "multiple_choice", "prompt": "In both texts, what does the court effectively turn rumor and accusation into?", "options": ["Personal friendship", "Legal and social power over the accused", "Religious celebration", "A public apology"], "answer": "Legal and social power over the accused"}, {"id": "q10", "type": "multiple_choice", "prompt": "What is the significance of dawn in 'Half-Hanged Mary'?", "options": ["It marks the end of her torture and the beginning of community fear and recognition of her autonomy", "It signals she has been forgiven by the town", "It proves the court was correct", "It resolves all conflict between Mary and the court"], "answer": "It marks the end of her torture and the beginning of community fear and recognition of her autonomy"}]}));
 </script>
 </body>
